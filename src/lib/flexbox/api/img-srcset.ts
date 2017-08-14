@@ -14,16 +14,26 @@ import {
   Renderer2,
   SimpleChanges
 } from '@angular/core';
-import {BaseFxDirective} from './base';
-import {MediaMonitor} from '../../media-query/media-monitor';
 import {ɵgetDOM as getDom} from '@angular/platform-browser';
 
+import {BaseFxDirective} from './base';
+import {MediaMonitor} from '../../media-query/media-monitor';
+import {MediaChange} from '../../media-query/media-change';
+import {BreakPointX} from '../responsive/responsive-activation';
+
+const DEFAULT_SRCSET = 'srcset';
+
 /**
- * Directive that injects -in a container <picture> element- <source> elements with media and
- * srcset attributes.
- * <source> elemets are sorted according to the related media query : from largest to smallest
+ * This directive provides a responsive API for the HTML 'srcset' attribute; and
+ * supports two (2) uses:
+ *    1) standalone <img>, or
+ *    2) nested <picture><img></picture>.
  *
- * For browsers not supporting the <picture> element, the Picturefill polyfill is still needed.
+ * The latter usage will inject [into the parent <picture> element] <source> elements
+ * with media and srcset attributes. Note that <source> elements are sorted according
+ * to the related media query : from largest to smallest
+ *
+ * > For browsers not supporting the <picture> element, the Picturefill polyfill is still needed.
  *
  * @see https://html.spec.whatwg.org/multipage/embedded-content.html#the-picture-element
  * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/picture
@@ -41,10 +51,6 @@ import {ɵgetDOM as getDom} from '@angular/platform-browser';
 })
 export class ImgSrcsetDirective extends BaseFxDirective implements OnInit, OnChanges {
 
-  /** Reference to injected source elements to be used when there is a need to update their
-   * attributes. */
-  private _registrySourceElements: {[input: string]: any} = {};
-
   /**
    * Intercept srcset assignment so we cache the default static value.
    * When the responsive breakpoint deactivates,it is possible that fallback static
@@ -52,39 +58,42 @@ export class ImgSrcsetDirective extends BaseFxDirective implements OnInit, OnCha
    * (if no other breakpoints activate)
    */
   @Input('srcset')
-  set srcsetBase(val) {
-    this._cacheInput('srcset', val);
-  }
+  set srcsetBase(val) { this._cacheInput('srcset', val);  }
 
   /* tslint:disable */
-  @Input('srcset.xs') set srcsetXs(val) {this._cacheInput('srcsetXs', val);}
-  @Input('srcset.sm') set srcsetSm(val) {this._cacheInput('srcsetSm', val);};
-  @Input('srcset.md') set srcsetMd(val) {this._cacheInput('srcsetMd', val);};
-  @Input('srcset.lg') set srcsetLg(val) {this._cacheInput('srcsetLg', val);};
-  @Input('srcset.xl') set srcsetXl(val) {this._cacheInput('srcsetXl', val);};
+  @Input('srcset.xs')     set srcsetXs(val)   { this._cacheInput('srcsetXs', val);  }
+  @Input('srcset.sm')     set srcsetSm(val)   { this._cacheInput('srcsetSm', val);  }
+  @Input('srcset.md')     set srcsetMd(val)   { this._cacheInput('srcsetMd', val);  }
+  @Input('srcset.lg')     set srcsetLg(val)   { this._cacheInput('srcsetLg', val);  };
+  @Input('srcset.xl')     set srcsetXl(val)   { this._cacheInput('srcsetXl', val);  };
 
-  @Input('srcset.lt-sm') set srcsetLtSm(val) {this._cacheInput('srcsetLtSm', val);};
-  @Input('srcset.lt-md') set srcsetLtMd(val) {this._cacheInput('srcsetLtMd', val);};
-  @Input('srcset.lt-lg') set srcsetLtLg(val) {this._cacheInput('srcsetLtLg', val);};
-  @Input('srcset.lt-xl') set srcsetLtXl(val) {this._cacheInput('srcsetLtXl', val);};
+  @Input('srcset.lt-sm')  set srcsetLtSm(val) { this._cacheInput('srcsetLtSm', val);  };
+  @Input('srcset.lt-md')  set srcsetLtMd(val) { this._cacheInput('srcsetLtMd', val);  };
+  @Input('srcset.lt-lg')  set srcsetLtLg(val) { this._cacheInput('srcsetLtLg', val);  };
+  @Input('srcset.lt-xl')  set srcsetLtXl(val) { this._cacheInput('srcsetLtXl', val);  };
 
-  @Input('srcset.gt-xs') set srcsetGtXs(val) {this._cacheInput('srcsetGtXs', val);};
-  @Input('srcset.gt-sm') set srcsetGtSm(val) {this._cacheInput('srcsetGtSm', val);};
-  @Input('srcset.gt-md') set srcsetGtMd(val) {this._cacheInput('srcsetGtMd', val);};
-  @Input('srcset.gt-lg') set srcsetGtLg(val) {this._cacheInput('srcsetGtLg', val);};
-
+  @Input('srcset.gt-xs')  set srcsetGtXs(val) { this._cacheInput('srcsetGtXs', val);  };
+  @Input('srcset.gt-sm')  set srcsetGtSm(val) { this._cacheInput('srcsetGtSm', val);  };
+  @Input('srcset.gt-md')  set srcsetGtMd(val) { this._cacheInput('srcsetGtMd', val);  };
+  @Input('srcset.gt-lg')  set srcsetGtLg(val) { this._cacheInput('srcsetGtLg', val);  };
   /* tslint:enable */
+
   constructor(elRef: ElementRef, renderer: Renderer2, monitor: MediaMonitor) {
     super(monitor, elRef, renderer);
   }
 
   /**
-   * Inject <source> elements once based on the used input properties
+   * Configure the Picture element with injected <source> elements or support responsive
+   * activation of the standalone- Img element.
    */
   ngOnInit() {
-    // build ResponsiveActivation proxy. There is no need to subsribe to mediaQuery changes as it is
-    // up to the browser to use the relevant injected <source> element
-    this._listenForMediaQueryChanges('srcset', '', () => {});
+    // Only responsively update srcset values for stand-alone image elements
+    this._listenForMediaQueryChanges(DEFAULT_SRCSET, '', (changes: MediaChange) => {
+      let activatedKey = DEFAULT_SRCSET + changes.suffix
+      this._updateSrcset(activatedKey)
+    });
+
+    this._configureIsolatedImg();
     this._injectSourceElements();
   }
 
@@ -94,9 +103,8 @@ export class ImgSrcsetDirective extends BaseFxDirective implements OnInit, OnCha
    */
   ngOnChanges(changes: SimpleChanges) {
     Object.keys(changes).forEach(key => {
-      if (!changes[key].firstChange && this._registrySourceElements[key]) {
-      this._renderer.setAttribute(
-        this._registrySourceElements[key], 'srcset', this._queryInput(key));
+      if (!changes[key].firstChange) {
+        this._updateSrcset(key);
       }
     });
   }
@@ -104,7 +112,26 @@ export class ImgSrcsetDirective extends BaseFxDirective implements OnInit, OnCha
   ngOnDestroy() {
     super.ngOnDestroy();
     // remove reference to dom elements to avoid memory leaks
-    this._registrySourceElements = null;
+    this._injectedSourceElements = null;
+  }
+
+  /**
+   * Responsive activation is used ONLY for standalone images
+   * Image tags nested in Picture containers, however, ignore responsive activations
+   * as injected <sources> are used. Changes to srcset values for nested images
+   * directly update the injected source elements.
+   */
+  protected _updateSrcset(activatedKey: string) {
+    if (!this.hasPictureParent) {
+      let target = this._injectedSourceElements[activatedKey];
+      // If databinding is used, then the attribute is removed and
+      // `ng-reflect-srcset-base` is used; so let's manually restore the attribute.
+      this._renderer.setAttribute(target, DEFAULT_SRCSET, this._queryInput(activatedKey));
+    } else {
+      // Identify the correct source and simply update the attribute with the new value
+      let target = this._injectedSourceElements[activatedKey] || this.nativeElement;
+      this._renderer.setAttribute(target, DEFAULT_SRCSET, this._queryInput(activatedKey));
+    }
   }
 
   /**
@@ -116,17 +143,47 @@ export class ImgSrcsetDirective extends BaseFxDirective implements OnInit, OnCha
    */
   protected _injectSourceElements() {
     let isBrowser = getDom().supportsDOMEvents();
-    if (!this._mqActivation || !isBrowser) {
-      return;
-    }
-    this._mqActivation.registryFromLargest.forEach(bpX => {
-      const sourceElt = this._renderer.createElement('source');
-      this._registrySourceElements[bpX.key] = sourceElt;
+    if (isBrowser && this.hasPictureParent && this._mqActivation ) {
+      let breakpointsInUse = this._mqActivation.registryFromLargest;
 
-      this._renderer.insertBefore(this.parentElement, sourceElt, this.nativeElement);
-      this._renderer.setAttribute(sourceElt, 'media', bpX.mediaQuery);
-      this._renderer.setAttribute(sourceElt, 'srcset', this._queryInput(bpX.key));
-    });
+      // If <picture><img></picture>, create a <source> elements inside the <picture> container;
+      // @see https://www.html5rocks.com/en/tutorials/responsive/picture-element/
+      breakpointsInUse.forEach((bpX: BreakPointX) => {
+        const sourceElt = this._renderer.createElement('source');
+        this._injectedSourceElements[bpX.key] = sourceElt;
+
+        this._renderer.setAttribute(sourceElt, 'media', bpX.mediaQuery);
+        this._renderer.setAttribute(sourceElt, DEFAULT_SRCSET, this._queryInput(bpX.key));
+        this._renderer.insertBefore(this.parentElement, sourceElt, this.nativeElement);
+      });
+    }
   }
 
+  /**
+   *  If only the <img> is defined with srcsets then use that as the target entry
+   *  add responsively update the property srcset based on activated input value
+   */
+  protected _configureIsolatedImg() {
+    if (!this.hasPictureParent) {
+      let target = this.nativeElement;
+
+      // If databinding is used, then the attribute is removed and
+      // `ng-reflect-srcset-base` is used; so let's manually restore the attribute.
+      this._renderer.setAttribute(target, DEFAULT_SRCSET, this._queryInput(DEFAULT_SRCSET));
+    }
+  }
+
+  /**
+   * Does the image (with srcset usages) have a <picture> parent;
+   * which is used as container for <source> element ?
+   * @see https://www.html5rocks.com/en/tutorials/responsive/picture-element/
+   *
+   */
+  protected get hasPictureParent() {
+    return this.parentElement.nodeName == 'PICTURE'
+  }
+
+  /** Reference to injected source elements to be used when there is a need to update their
+   * attributes. */
+  private _injectedSourceElements: { [input: string]: any } = {};
 }

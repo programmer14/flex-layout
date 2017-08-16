@@ -19,7 +19,7 @@ import {
   applyStyleToElements
 } from '../../utils/style-utils';
 
-import {ResponsiveActivation, KeyOptions} from '../responsive/responsive-activation';
+import {ResponsiveActivation, KeyOptions} from '../core/responsive-activation';
 import {MediaMonitor} from '../../media-query/media-monitor';
 import {MediaQuerySubscriber} from '../../media-query/media-change';
 

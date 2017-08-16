@@ -214,10 +214,10 @@ function buildCompareStyleFunction(inlineOnly = true) {
 
     allPassed = Object.keys(styles).length !== 0;
     Object.keys(styles).forEach(prop => {
-      let {elHasStyle, current} = hasPrefixedStyles(actual, prop, styles[prop], inlineOnly)
+      let {elHasStyle, current} = hasPrefixedStyles(actual, prop, styles[prop], inlineOnly);
       allPassed = allPassed && elHasStyle;
       if (!elHasStyle) {
-        extendObject(found, current)
+        extendObject(found, current);
       }
     });
 
@@ -232,7 +232,7 @@ function buildCompareStyleFunction(inlineOnly = true) {
               `;
       }
     };
-  }
+  };
 }
 
 /**

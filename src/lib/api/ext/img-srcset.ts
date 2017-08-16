@@ -7,19 +7,20 @@
  */
 import {
   Directive,
+  ElementRef,
   Input,
   OnInit,
   OnChanges,
-  ElementRef,
+  OnDestroy,
   Renderer2,
   SimpleChanges
 } from '@angular/core';
 import {ɵgetDOM as getDom} from '@angular/platform-browser';
 
-import {BaseFxDirective} from './base';
+import {BaseFxDirective} from '../core/base';
 import {MediaMonitor} from '../../media-query/media-monitor';
 import {MediaChange} from '../../media-query/media-change';
-import {BreakPointX} from '../responsive/responsive-activation';
+import {BreakPointX} from '../core/responsive-activation';
 
 const DEFAULT_SRCSET = 'srcset';
 
@@ -29,9 +30,18 @@ const DEFAULT_SRCSET = 'srcset';
  *    1) standalone <img>, or
  *    2) nested <picture><img></picture>.
  *
- * The latter usage will inject [into the parent <picture> element] <source> elements
- * with media and srcset attributes. Note that <source> elements are sorted according
- * to the related media query : from largest to smallest
+ * In both cases the expression/value assigned is simply the appropriate image url.
+ * e.g.
+ *      <img srcset="defaultScene.jpg" srcset.xs="mobileScene.jpg"></img>
+ *      <picture>
+ *        <img srcset="defaultScene.jpg" srcset.xs="mobileScene.jpg"></img>
+ *      </picture>
+ *
+ * For standalone (1) usages, this directive will update the img.src property with the responsive
+ * activated input value. For picture (2) usages, this directive will inject
+ * [into the parent <picture> element] <source> elements with media and srcset attributes.
+ * Note that <source> elements are sorted according to the related media query :
+ *      from largest to smallest
  *
  * > For browsers not supporting the <picture> element, the Picturefill polyfill is still needed.
  *
@@ -43,39 +53,38 @@ const DEFAULT_SRCSET = 'srcset';
  */
 @Directive({
   selector: `
-  [srcset],
-  [srcset.xs], [srcset.sm], [srcset.md], [srcset.lg], [srcset.xl],
-  [srcset.lt-sm], [srcset.lt-md], [srcset.lt-lg], [srcset.lt-xl],
-  [srcset.gt-xs], [srcset.gt-sm], [srcset.gt-md], [srcset.gt-lg]
+  img[srcset],
+  img[srcset.xs], img[srcset.sm], img[srcset.md], img[srcset.lg], img[srcset.xl],
+  img[srcset.lt-sm], img[srcset.lt-md], img[srcset.lt-lg], img[srcset.lt-xl],
+  img[srcset.gt-xs], img[srcset.gt-sm], img[srcset.gt-md], img[srcset.gt-lg]
 `
 })
-export class ImgSrcsetDirective extends BaseFxDirective implements OnInit, OnChanges {
+export class ImgSrcsetDirective extends BaseFxDirective implements OnInit, OnChanges, OnDestroy {
 
+  /* tslint:disable */
   /**
    * Intercept srcset assignment so we cache the default static value.
    * When the responsive breakpoint deactivates,it is possible that fallback static
    * value (which is used to clear the deactivated value) will be used
    * (if no other breakpoints activate)
    */
-  @Input('srcset')
-  set srcsetBase(val) { this._cacheInput('srcset', val);  }
+  @Input('srcset')        set srcsetBase(val) { this._cacheInput('srcset', val);    }
 
-  /* tslint:disable */
   @Input('srcset.xs')     set srcsetXs(val)   { this._cacheInput('srcsetXs', val);  }
   @Input('srcset.sm')     set srcsetSm(val)   { this._cacheInput('srcsetSm', val);  }
   @Input('srcset.md')     set srcsetMd(val)   { this._cacheInput('srcsetMd', val);  }
-  @Input('srcset.lg')     set srcsetLg(val)   { this._cacheInput('srcsetLg', val);  };
-  @Input('srcset.xl')     set srcsetXl(val)   { this._cacheInput('srcsetXl', val);  };
+  @Input('srcset.lg')     set srcsetLg(val)   { this._cacheInput('srcsetLg', val);  }
+  @Input('srcset.xl')     set srcsetXl(val)   { this._cacheInput('srcsetXl', val);  }
 
-  @Input('srcset.lt-sm')  set srcsetLtSm(val) { this._cacheInput('srcsetLtSm', val);  };
-  @Input('srcset.lt-md')  set srcsetLtMd(val) { this._cacheInput('srcsetLtMd', val);  };
-  @Input('srcset.lt-lg')  set srcsetLtLg(val) { this._cacheInput('srcsetLtLg', val);  };
-  @Input('srcset.lt-xl')  set srcsetLtXl(val) { this._cacheInput('srcsetLtXl', val);  };
+  @Input('srcset.lt-sm')  set srcsetLtSm(val) { this._cacheInput('srcsetLtSm', val);  }
+  @Input('srcset.lt-md')  set srcsetLtMd(val) { this._cacheInput('srcsetLtMd', val);  }
+  @Input('srcset.lt-lg')  set srcsetLtLg(val) { this._cacheInput('srcsetLtLg', val);  }
+  @Input('srcset.lt-xl')  set srcsetLtXl(val) { this._cacheInput('srcsetLtXl', val);  }
 
-  @Input('srcset.gt-xs')  set srcsetGtXs(val) { this._cacheInput('srcsetGtXs', val);  };
-  @Input('srcset.gt-sm')  set srcsetGtSm(val) { this._cacheInput('srcsetGtSm', val);  };
-  @Input('srcset.gt-md')  set srcsetGtMd(val) { this._cacheInput('srcsetGtMd', val);  };
-  @Input('srcset.gt-lg')  set srcsetGtLg(val) { this._cacheInput('srcsetGtLg', val);  };
+  @Input('srcset.gt-xs')  set srcsetGtXs(val) { this._cacheInput('srcsetGtXs', val);  }
+  @Input('srcset.gt-sm')  set srcsetGtSm(val) { this._cacheInput('srcsetGtSm', val);  }
+  @Input('srcset.gt-md')  set srcsetGtMd(val) { this._cacheInput('srcsetGtMd', val);  }
+  @Input('srcset.gt-lg')  set srcsetGtLg(val) { this._cacheInput('srcsetGtLg', val);  }
   /* tslint:enable */
 
   constructor(elRef: ElementRef, renderer: Renderer2, monitor: MediaMonitor) {
@@ -87,13 +96,16 @@ export class ImgSrcsetDirective extends BaseFxDirective implements OnInit, OnCha
    * activation of the standalone- Img element.
    */
   ngOnInit() {
+    super.ngOnInit();
+    this._configureIsolatedImg();
+
     // Only responsively update srcset values for stand-alone image elements
+    // Fallback to [srcset] value for responsive deactivation
     this._listenForMediaQueryChanges(DEFAULT_SRCSET, '', (changes: MediaChange) => {
-      let activatedKey = DEFAULT_SRCSET + changes.suffix
-      this._updateSrcset(activatedKey)
+      let activatedKey = changes.matches ? DEFAULT_SRCSET + changes.suffix : DEFAULT_SRCSET;
+      this._updateSrcsetFor(activatedKey);
     });
 
-    this._configureIsolatedImg();
     this._injectSourceElements();
   }
 
@@ -102,11 +114,11 @@ export class ImgSrcsetDirective extends BaseFxDirective implements OnInit, OnCha
    * properties. <source> elements are injected once through ngOnInit
    */
   ngOnChanges(changes: SimpleChanges) {
-    Object.keys(changes).forEach(key => {
-      if (!changes[key].firstChange) {
-        this._updateSrcset(key);
-      }
-    });
+    if (this.hasInitialized) {
+      Object.keys(changes).forEach(key => {
+        this._updateSrcsetFor(key);
+      });
+    }
   }
 
   ngOnDestroy() {
@@ -117,19 +129,21 @@ export class ImgSrcsetDirective extends BaseFxDirective implements OnInit, OnCha
 
   /**
    * Responsive activation is used ONLY for standalone images
+   *
    * Image tags nested in Picture containers, however, ignore responsive activations
    * as injected <sources> are used. Changes to srcset values for nested images
    * directly update the injected source elements.
+   *
+   * For stand-alone img elements with responsive srcset attributes, the
+   * img.src property will be responsively updated.
    */
-  protected _updateSrcset(activatedKey: string) {
+  protected _updateSrcsetFor(activatedKey: string) {
     if (!this.hasPictureParent) {
-      let target = this._injectedSourceElements[activatedKey];
-      // If databinding is used, then the attribute is removed and
-      // `ng-reflect-srcset-base` is used; so let's manually restore the attribute.
-      this._renderer.setAttribute(target, DEFAULT_SRCSET, this._queryInput(activatedKey));
+      let target = this.nativeElement;
+      this._renderer.setAttribute(target, 'src', this._queryInput(activatedKey));
     } else {
       // Identify the correct source and simply update the attribute with the new value
-      let target = this._injectedSourceElements[activatedKey] || this.nativeElement;
+      let target = this._injectedSourceElements[activatedKey];
       this._renderer.setAttribute(target, DEFAULT_SRCSET, this._queryInput(activatedKey));
     }
   }
@@ -167,9 +181,19 @@ export class ImgSrcsetDirective extends BaseFxDirective implements OnInit, OnCha
     if (!this.hasPictureParent) {
       let target = this.nativeElement;
 
+      // If [srcset] is not defined AND responsive API is in use
+      // then set [srcset] from the [src] property
+
+      let numInputsUsed = Object.keys(this._inputMap).length;
+      if ( !this._queryInput(DEFAULT_SRCSET) && numInputsUsed ) {
+        this.srcsetBase = getDom().getAttribute(target, 'src');
+      }
+
       // If databinding is used, then the attribute is removed and
       // `ng-reflect-srcset-base` is used; so let's manually restore the attribute.
+
       this._renderer.setAttribute(target, DEFAULT_SRCSET, this._queryInput(DEFAULT_SRCSET));
+      this._renderer.setProperty(target, DEFAULT_SRCSET, this._queryInput(DEFAULT_SRCSET));
     }
   }
 
@@ -180,7 +204,7 @@ export class ImgSrcsetDirective extends BaseFxDirective implements OnInit, OnCha
    *
    */
   protected get hasPictureParent() {
-    return this.parentElement.nodeName == 'PICTURE'
+    return this.parentElement.nodeName == 'PICTURE';
   }
 
   /** Reference to injected source elements to be used when there is a need to update their

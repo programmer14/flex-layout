@@ -20,7 +20,7 @@ import {
 } from '@angular/core';
 import {Subscription} from 'rxjs/Subscription';
 
-import {BaseFxDirective} from './base';
+import {BaseFxDirective} from '../core/base';
 import {LayoutDirective} from './layout';
 import {MediaChange} from '../../media-query/media-change';
 import {MediaMonitor} from '../../media-query/media-monitor';

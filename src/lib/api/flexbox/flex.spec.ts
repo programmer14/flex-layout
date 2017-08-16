@@ -14,8 +14,8 @@ import {BreakPointRegistry} from '../../media-query/breakpoints/break-point-regi
 import {MockMatchMedia} from '../../media-query/mock/mock-match-media';
 import {MatchMedia} from '../../media-query/match-media';
 import {FlexLayoutModule} from '../../module';
-import {FlexDirective} from '../../flexbox/api/flex';
-import {LayoutDirective} from '../../flexbox/api/layout';
+import {FlexDirective} from '../../api/flexbox/flex';
+import {LayoutDirective} from '../../api/flexbox/layout';
 
 import {customMatchers, expect} from '../../utils/testing/custom-matchers';
 import {_dom as _} from '../../utils/testing/dom-tools';
